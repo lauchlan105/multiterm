@@ -10,12 +10,12 @@ type Tab struct {
 func (t *Terminal) NewTab() Tab {
 
 	//Create new tab
-
+	tab := Tab{}
 	//Add to terminal
 
 	//return
 
-	return Tab{}
+	return tab
 }
 
 //Open asdf
