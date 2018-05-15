@@ -18,4 +18,5 @@ func main() {
 	window, _ := multiterm.Init()
 	defer window.Stop()
 	window.Start()
+
 }

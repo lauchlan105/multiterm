@@ -1,7 +1,6 @@
 package multiterm
 
 import (
-	"fmt"
 	"strconv"
 
 	"github.com/nsf/termbox-go"
@@ -20,21 +19,17 @@ type Terminal struct {
 	activeTabs []*Tab
 	focus      *Tab
 	buffer     []termbox.Cell
+	sepIndexes []int
 }
 
 //Init returns
 func Init() (terminal Terminal, tab Tab) {
 
-	defaultSplitRune := '|'
-
 	terminal = Terminal{
-		fg:        termbox.ColorDefault,
-		bg:        termbox.ColorDefault,
-		splitRune: defaultSplitRune,
+		fg: termbox.ColorDefault,
+		bg: termbox.ColorDefault,
 		splitCell: termbox.Cell{
-			Ch: '|',
-			Fg: termbox.ColorDefault,
-			Bg: termbox.ColorDefault,
+			Bg: termbox.ColorWhite,
 		},
 
 		tabs:       make(map[string]Tab, 0),
@@ -54,9 +49,15 @@ func Init() (terminal Terminal, tab Tab) {
 //Start asdf
 func (t *Terminal) Start() {
 
+	//Init termbox
 	termbox.Init()
+
+	//Set the terminal objects that rely
+	//on the initialised termbox
+	t.updateSize()
+	t.buffer = make([]termbox.Cell, t.height*t.width)
+
 	termbox.SetInputMode(termbox.InputEsc | termbox.InputMouse)
-	t.resize()
 
 	for {
 		switch e := termbox.PollEvent(); e.Type {
@@ -65,14 +66,12 @@ func (t *Terminal) Start() {
 				return
 			}
 		case termbox.EventResize:
-			fmt.Println("Resized")
-			t.resize()
+			t.updateSize()
+			t.printTabs()
 		case termbox.EventMouse:
 			if e.Key == termbox.MouseLeft {
 				newTab := t.NewTab()
 				newTab.Open()
-				fmt.Println("Added tab")
-				fmt.Println(len(t.activeTabs))
 				t.printTabs()
 			}
 		}
@@ -86,22 +85,28 @@ func (t *Terminal) Stop() {
 	termbox.Close()
 }
 
-func (t *Terminal) resize() {
+func (t *Terminal) updateSize() {
 	t.width, t.height = termbox.Size()
+	t.height += 5
 }
 
 func (t *Terminal) printTabs() {
 
+	t.buffer = make([]termbox.Cell, t.width*t.height)
+
 	numOfSeps := len(t.activeTabs) - 1
 
 	if numOfSeps > 0 {
-		sepDist := t.width / len(t.activeTabs)
+		sepDist := (t.width) / len(t.activeTabs)
 
-		for h := 0; h < t.height; h += t.width {
+		for h := 0; h < t.height; h++ {
 			for sep := 0; sep < numOfSeps; sep++ {
-				t.buffer[h+(sepDist*sep)] = t.splitCell
+				row := h * t.width
+				col := (sep + 1) * sepDist
+				t.buffer[row+col] = t.splitCell
 			}
 		}
+
 	}
 
 	//Update and flush termbox buffer
