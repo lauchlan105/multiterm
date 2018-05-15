@@ -1,7 +1,6 @@
 package multiterm
 
 import (
-	"github.com/lauchlan105/multiterm/tab"
 	"github.com/nsf/termbox-go"
 )
 
@@ -11,11 +10,11 @@ type Terminal struct {
 	width  int
 	fg     termbox.Attribute
 	bg     termbox.Attribute
-	tabs   []tab.Tab
+	tabs   []Tab
 }
 
 //Init returns
-func Init(textColor, backgroundColor termbox.Attribute) (terminal Terminal, tab tab.Tab) {
+func Init(textColor, backgroundColor termbox.Attribute) (terminal Terminal, tab Tab) {
 
 	terminal = Terminal{
 		height: 0,
@@ -27,11 +26,6 @@ func Init(textColor, backgroundColor termbox.Attribute) (terminal Terminal, tab 
 
 	return terminal, terminal.tabs[0]
 
-}
-
-//NewTab creates and returns a new tab. (Initialised but not open)
-func (t *Terminal) NewTab() tab.Tab {
-	return tab.Tab{}
 }
 
 //CloseTab closes a tab

@@ -1,12 +1,20 @@
-package tab
+package multiterm
 
 //Tab asdf
 type Tab struct {
-	id int
+	manager *Terminal
+	id      int
 }
 
 //NewTab asdf
-func NewTab() Tab {
+func (t *Terminal) NewTab() Tab {
+
+	//Create new tab
+
+	//Add to terminal
+
+	//return
+
 	return Tab{}
 }
 
