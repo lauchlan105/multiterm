@@ -2,10 +2,6 @@
 package main
 
 import (
-	"time"
-
-	"github.com/nsf/termbox-go"
-
 	"github.com/lauchlan105/multiterm/multiterm"
 )
 
@@ -19,8 +15,7 @@ type tab struct {
 
 func main() {
 
-	window, _ := multiterm.Init(termbox.ColorDefault, termbox.ColorDefault)
+	window, _ := multiterm.Init()
 	defer window.Stop()
-	time.Sleep(10 * time.Second)
-
+	window.Start()
 }
