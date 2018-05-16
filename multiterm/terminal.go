@@ -12,7 +12,6 @@ type Terminal struct {
 	width     int
 	fg        termbox.Attribute
 	bg        termbox.Attribute
-	splitRune rune
 	splitCell termbox.Cell
 
 	tabs       map[string]Tab
@@ -56,23 +55,30 @@ func (t *Terminal) Start() {
 	//on the initialised termbox
 	t.updateSize()
 	t.buffer = make([]termbox.Cell, t.height*t.width)
-
 	termbox.SetInputMode(termbox.InputEsc | termbox.InputMouse)
+
+	go func() {
+		for {
+			switch e := termbox.PollEvent(); e.Type {
+			case termbox.EventResize:
+				t.updateSize()
+			case termbox.EventMouse:
+				if e.Key == termbox.MouseLeft {
+					newTab := t.NewTab()
+					newTab.Open()
+				}
+			}
+			t.updateSize()
+			t.printTabs()
+
+		}
+	}()
 
 	for {
 		switch e := termbox.PollEvent(); e.Type {
 		case termbox.EventKey:
-			if e.Key == 3 { //Ctrl+C
+			if e.Key == 3 {
 				return
-			}
-		case termbox.EventResize:
-			t.updateSize()
-			t.printTabs()
-		case termbox.EventMouse:
-			if e.Key == termbox.MouseLeft {
-				newTab := t.NewTab()
-				newTab.Open()
-				t.printTabs()
 			}
 		}
 	}
@@ -87,34 +93,42 @@ func (t *Terminal) Stop() {
 
 func (t *Terminal) updateSize() {
 	t.width, t.height = termbox.Size()
-	t.height += 5
 }
 
 func (t *Terminal) printTabs() {
 
 	t.buffer = make([]termbox.Cell, t.width*t.height)
 
-	numOfSeps := len(t.activeTabs) - 1
+	t.printSeps()
 
-	if numOfSeps > 0 {
-		sepDist := (t.width) / len(t.activeTabs)
+	t.updateBuffer()
 
+}
+
+//Print all tab seperators
+func (t *Terminal) printSeps() {
+
+	numSeps := len(t.activeTabs) - 1
+	tabWidth := t.width / len(t.activeTabs)
+
+	//Print seperators
+	for sep := 1; sep <= numSeps; sep++ {
+
+		// '-1' offsets to start printing from 0 (not 1)
+		x := (sep * tabWidth) - 1
 		for h := 0; h < t.height; h++ {
-			for sep := 0; sep < numOfSeps; sep++ {
-				row := h * t.width
-				col := (sep + 1) * sepDist
-				t.buffer[row+col] = t.splitCell
-			}
+			row := h * t.width
+			t.buffer[row+x] = t.splitCell
 		}
 
 	}
+}
 
-	//Update and flush termbox buffer
+func (t *Terminal) updateBuffer() {
 	copy(termbox.CellBuffer(), t.buffer)
 	if err := termbox.Flush(); err != nil {
 
 	}
-
 }
 
 /////////////////////////////////////
@@ -157,9 +171,4 @@ func (t *Terminal) generateTabID() string {
 	}
 
 	return strconv.Itoa(nextID)
-}
-
-//NumTabs asdf
-func (t *Terminal) NumTabs() string {
-	return strconv.Itoa(len(t.tabs))
 }

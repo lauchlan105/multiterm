@@ -9,6 +9,8 @@ type Tab struct {
 	buffer  []string
 }
 
+
+
 //Terminate kills the current tab
 //via the Terminal objects removeTab(id) func
 func (t *Tab) Terminate() {
@@ -42,5 +44,9 @@ func (t *Tab) Close() {
 			break
 		}
 	}
+
+}
+
+func (t *Tab) print() {
 
 }
