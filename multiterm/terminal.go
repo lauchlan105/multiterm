@@ -19,6 +19,7 @@ type Terminal struct {
 	focus      *Tab
 	buffer     []termbox.Cell
 	sepIndexes []int
+	tabWidth   int
 }
 
 //Init returns
@@ -34,10 +35,10 @@ func Init() (terminal Terminal, tab Tab) {
 		tabs:       make(map[string]Tab, 0),
 		activeTabs: make([]*Tab, 0),
 	}
-	tab = terminal.NewTab()
-	tab.Open()
 
-	return terminal, terminal.tabs[tab.id]
+	newTab := terminal.NewTab()
+
+	return terminal, newTab
 
 }
 
@@ -53,32 +54,23 @@ func (t *Terminal) Start() {
 
 	//Set the terminal objects that rely
 	//on the initialised termbox
-	t.updateSize()
-	t.buffer = make([]termbox.Cell, t.height*t.width)
 	termbox.SetInputMode(termbox.InputEsc | termbox.InputMouse)
-
-	go func() {
-		for {
-			switch e := termbox.PollEvent(); e.Type {
-			case termbox.EventResize:
-				t.updateSize()
-			case termbox.EventMouse:
-				if e.Key == termbox.MouseLeft {
-					newTab := t.NewTab()
-					newTab.Open()
-				}
-			}
-			t.updateSize()
-			t.printTabs()
-
-		}
-	}()
 
 	for {
 		switch e := termbox.PollEvent(); e.Type {
 		case termbox.EventKey:
 			if e.Key == 3 {
 				return
+			}
+		case termbox.EventResize:
+			t.printAll()
+		case termbox.EventMouse:
+			if e.Key == termbox.MouseLeft {
+				newTab := t.NewTab()
+				newTab.Open()
+				t.focus = &newTab
+			} else if e.Key == termbox.MouseMiddle {
+				t.focus.Terminate()
 			}
 		}
 	}
@@ -92,38 +84,74 @@ func (t *Terminal) Stop() {
 }
 
 func (t *Terminal) updateSize() {
+
 	t.width, t.height = termbox.Size()
+
+	//Save new tab width (this includes the sep)
+	if len(t.activeTabs) <= 0 {
+		t.tabWidth = t.width
+	} else {
+		t.tabWidth = t.width / len(t.activeTabs)
+	}
+
+	//clear the saved seperator indexes
+	t.sepIndexes = make([]int, 0)
+
+	//Push new seperator indexes to sepIndexes slice
+	numSeps := len(t.activeTabs) - 1
+	for sep := 1; sep <= numSeps; sep++ {
+
+		// '-1' offsets to start printing from 0 (not 1)
+		x := (sep * t.tabWidth) - 1
+		t.sepIndexes = append(t.sepIndexes, x)
+
+	}
+
 }
 
-func (t *Terminal) printTabs() {
+func (t *Terminal) printAll() {
 
+	//Update printing-related variables
+	t.updateSize()
+
+	//Clear buffer
 	t.buffer = make([]termbox.Cell, t.width*t.height)
 
+	//Print actual chars
+	t.printTabs()
 	t.printSeps()
 
+	//Copy buffer to termbox
 	t.updateBuffer()
 
 }
 
-//Print all tab seperators
+//print all tabs
+func (t *Terminal) printTabs() {
+	for indexOfTab, tab := range t.activeTabs {
+		tab.print(indexOfTab)
+	}
+}
+
+//print all tab seperators
 func (t *Terminal) printSeps() {
 
-	numSeps := len(t.activeTabs) - 1
-	tabWidth := t.width / len(t.activeTabs)
-
 	//Print seperators
-	for sep := 1; sep <= numSeps; sep++ {
+	for _, x := range t.sepIndexes {
 
 		// '-1' offsets to start printing from 0 (not 1)
-		x := (sep * tabWidth) - 1
 		for h := 0; h < t.height; h++ {
 			row := h * t.width
-			t.buffer[row+x] = t.splitCell
+			dest := row + x
+			if dest < len(t.buffer) {
+				t.buffer[row+x] = t.splitCell
+			}
 		}
 
 	}
 }
 
+//copy t.buffer to termbox buffer
 func (t *Terminal) updateBuffer() {
 	copy(termbox.CellBuffer(), t.buffer)
 	if err := termbox.Flush(); err != nil {
@@ -143,13 +171,14 @@ func (t *Terminal) NewTab() Tab {
 		manager: t,
 		id:      t.generateTabID(),
 		name:    "Untitled",
+		buffer:  make([]string, 0),
 	}
 
 	//Add to terminal
 	t.tabs[tab.id] = tab
 
 	//return
-	return tab
+	return t.tabs[tab.id]
 
 }
 
