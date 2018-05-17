@@ -61,26 +61,40 @@ func (t *Tab) print(indexOfTab int) {
 	combinedBuffer := strings.Join(t.buffer, "")
 
 	matrix := make([][]termbox.Cell, 0)
+	matrix = append(matrix, make([]termbox.Cell, 0))
 
-	for i, ch := range combinedBuffer {
+	for _, ch := range combinedBuffer {
 
-		col := i % (width + 1)
-		row := i / width
+		appendChar := func(ch rune) {
 
-		if col == 0 {
-			matrix = append(matrix, make([]termbox.Cell, 0))
+			//if last row doesn't exist -> make it
+			if len(matrix) == 0 {
+				matrix = append(matrix, make([]termbox.Cell, 0))
+			}
+
+			//if last row is full
+			//create a new row
+			if len(matrix[len(matrix)-1]) == width {
+				matrix = append(matrix, make([]termbox.Cell, 0))
+			}
+
+			//Get last row
+			rowInd := len(matrix) - 1
+
+			//Append char to current row
+			matrix[rowInd] = append(matrix[rowInd], termbox.Cell{Ch: ch})
+
+			//If the current char is a newline,
+			//append whitespaces to the rest of the row
+			if ch == '\n' {
+				numberOfWhiteSpaces := width - len(matrix[rowInd])
+				for numberOfWhiteSpaces > 0 {
+					matrix[rowInd] = append(matrix[rowInd], termbox.Cell{Ch: ' '})
+					numberOfWhiteSpaces--
+				}
+			}
 		}
-
-		// if ch == '\n' {
-		// 	emptyChars := width - col + 1 //+1 to include '\n'
-		// 	for emptyChars > 0 {
-		// 		matrix[row] = append(matrix[row], termbox.Cell{Ch: '\n'})
-		// 		emptyChars--
-		// 	}
-		// } else {
-		newRow := append(matrix[row], termbox.Cell{Ch: ch})
-		matrix[row] = newRow
-		// }
+		appendChar(ch)
 
 	}
 

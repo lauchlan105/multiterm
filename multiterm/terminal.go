@@ -176,7 +176,7 @@ func (t *Terminal) NewTab() Tab {
 	}
 
 	tab.buffer = append(tab.buffer, []string{
-		"ID: " + tab.id + "\n",
+		"ID: " + tab.id + "\n\n\n",
 		"Title: " + tab.name + "\n",
 	}...)
 
