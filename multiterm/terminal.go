@@ -71,6 +71,7 @@ func (t *Terminal) Start() {
 				t.focus = &newTab
 			} else if e.Key == termbox.MouseMiddle {
 				t.focus.Terminate()
+				t.focus = t.activeTabs[0]
 			}
 		}
 	}
@@ -173,6 +174,11 @@ func (t *Terminal) NewTab() Tab {
 		name:    "Untitled",
 		buffer:  make([]string, 0),
 	}
+
+	tab.buffer = append(tab.buffer, []string{
+		"ID: " + tab.id + "\n",
+		"Title: " + tab.name + "\n",
+	}...)
 
 	//Add to terminal
 	t.tabs[tab.id] = tab

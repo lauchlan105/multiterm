@@ -56,11 +56,6 @@ func (t *Tab) Close() {
 func (t *Tab) print(indexOfTab int) {
 
 	width := t.manager.tabWidth - 1 //width minus seperator
-
-	if width <= 0 {
-		return
-	}
-	// height := t.manager.height
 	startingX := indexOfTab * t.manager.tabWidth
 
 	combinedBuffer := strings.Join(t.buffer, "")
@@ -76,15 +71,16 @@ func (t *Tab) print(indexOfTab int) {
 			matrix = append(matrix, make([]termbox.Cell, 0))
 		}
 
-		if ch == '\n' {
-			emptyChars := width - col + 1 //+1 to include '\n'
-			for emptyChars > 0 {
-				matrix[row] = append(matrix[row], termbox.Cell{Ch: ' '})
-				emptyChars--
-			}
-		} else {
-			matrix[row] = append(matrix[row], termbox.Cell{Ch: ch})
-		}
+		// if ch == '\n' {
+		// 	emptyChars := width - col + 1 //+1 to include '\n'
+		// 	for emptyChars > 0 {
+		// 		matrix[row] = append(matrix[row], termbox.Cell{Ch: '\n'})
+		// 		emptyChars--
+		// 	}
+		// } else {
+		newRow := append(matrix[row], termbox.Cell{Ch: ch})
+		matrix[row] = newRow
+		// }
 
 	}
 
