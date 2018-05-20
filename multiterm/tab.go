@@ -1,18 +1,21 @@
 package multiterm
 
 import (
-	"strings"
+	"log"
+	"os"
 
 	termbox "github.com/nsf/termbox-go"
 )
 
 //Tab asdf
 type Tab struct {
-	manager *Terminal
-	id      string
-	name    string
-	active  bool
-	buffer  []string
+	manager       *Terminal
+	id            string
+	name          string
+	active        bool
+	buffer        string
+	visibleBuffer [][]termbox.Cell
+	scrollHeight  int
 }
 
 //Terminate kills the current tab
@@ -29,6 +32,7 @@ func (t *Tab) Open() {
 		return
 	}
 	t.active = true
+	t.scrollHeight = 0
 
 	t.manager.activeTabs = append(t.manager.activeTabs, t)
 	t.manager.printAll()
@@ -53,17 +57,87 @@ func (t *Tab) Close() {
 	t.manager.printAll()
 }
 
-func (t *Tab) print(indexOfTab int) {
+func (t *Tab) printTab(indexOfTab int) {
 
-	width := t.manager.tabWidth - 1 //width minus seperator
+	windowHeight := t.manager.height
 	startingX := indexOfTab * t.manager.tabWidth
 
-	combinedBuffer := strings.Join(t.buffer, "")
+	t.setVisibleBuffer()
+	matrix := t.visibleBuffer
 
+	//if the matrix has more lines than
+	//the window height allows -> remove all lines
+	//outside the frame (based off scrollheight)
+	if len(matrix) > windowHeight {
+
+		startOfWindow := len(matrix) - t.scrollHeight - windowHeight
+		endOfWindow := startOfWindow + windowHeight - 1
+
+		if t.scrollHeight < 0 {
+			endOfWindow += t.scrollHeight
+		}
+
+		startOutOfBounds := startOfWindow < 0 || startOfWindow > len(matrix)
+		endOutOfBounds := endOfWindow < 0 || endOfWindow > len(matrix)
+
+		if startOutOfBounds {
+			log.Println("Starting val out of bounds")
+		}
+
+		if endOutOfBounds {
+			log.Println("Ending val out of bounds")
+		}
+
+		if endOutOfBounds || startOutOfBounds {
+			os.Exit(1)
+		}
+
+		matrix = matrix[startOfWindow:endOfWindow]
+
+	}
+
+	for rowIndex, row := range matrix {
+		for colIndex, Ch := range row {
+			y := rowIndex * t.manager.width
+			x := colIndex + startingX
+			dest := y + x
+			t.manager.buffer[dest] = Ch
+		}
+	}
+
+}
+
+//Print prints to the terminal without starting a new line
+func (t *Tab) Print(str string) {
+	t.buffer += str
+}
+
+//Println prints a line to the terminal
+func (t *Tab) Println(str string) {
+	t.Print(str + "\n")
+}
+
+//ScrollUp asdf
+func (t *Tab) ScrollUp() {
+	if t.scrollHeight < len(t.visibleBuffer)-t.manager.height {
+		t.scrollHeight++
+	}
+}
+
+//ScrollDown asdf
+func (t *Tab) ScrollDown() {
+	if t.manager.height-(t.scrollHeight*-1) > 2 {
+		t.scrollHeight--
+	}
+}
+
+func (t *Tab) setVisibleBuffer() {
+
+	width := t.manager.tabWidth - 1
 	matrix := make([][]termbox.Cell, 0)
 	matrix = append(matrix, make([]termbox.Cell, 0))
 
-	for _, ch := range combinedBuffer {
+	for _, ch := range t.buffer {
 
 		appendChar := func(ch rune) {
 
@@ -95,16 +169,6 @@ func (t *Tab) print(indexOfTab int) {
 			}
 		}
 		appendChar(ch)
-
 	}
-
-	for rowIndex, row := range matrix {
-		for colIndex, Ch := range row {
-			y := rowIndex * t.manager.width
-			x := colIndex + startingX
-			dest := y + x
-			t.manager.buffer[dest] = Ch
-		}
-	}
-
+	t.visibleBuffer = matrix
 }
