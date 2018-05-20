@@ -72,6 +72,17 @@ func (t *Terminal) Start() {
 			} else if e.Key == termbox.MouseMiddle {
 				t.focus.Terminate()
 				t.focus = t.activeTabs[0]
+			} else if e.Key == termbox.MouseWheelUp {
+				if tab := t.getMouseFocus(e.MouseX); tab != nil {
+					tab.ScrollUp()
+				}
+				t.printAll()
+			} else if e.Key == termbox.MouseWheelDown {
+
+				if tab := t.getMouseFocus(e.MouseX); tab != nil {
+					tab.ScrollDown()
+				}
+				t.printAll()
 			}
 		}
 	}
@@ -129,17 +140,28 @@ func (t *Terminal) printAll() {
 
 //print all tabs
 func (t *Terminal) printTabs() {
+	blockChan := make(chan bool, 1)
+	waitingOn := len(t.activeTabs)
 	for indexOfTab, tab := range t.activeTabs {
-		tab.print(indexOfTab)
+		go func(i int, tab *Tab) {
+			tab.printTab(i)
+			blockChan <- true
+		}(indexOfTab, tab)
 	}
+
+	for <-blockChan {
+		waitingOn--
+		if waitingOn == 0 {
+			return
+		}
+	}
+
 }
 
 //print all tab seperators
 func (t *Terminal) printSeps() {
-
 	//Print seperators
 	for _, x := range t.sepIndexes {
-
 		// '-1' offsets to start printing from 0 (not 1)
 		for h := 0; h < t.height; h++ {
 			row := h * t.width
@@ -151,6 +173,10 @@ func (t *Terminal) printSeps() {
 
 	}
 }
+
+////////////////////////////////
+//  BUFFER RELATED FUNCTIONS  //
+////////////////////////////////
 
 //copy t.buffer to termbox buffer
 func (t *Terminal) updateBuffer() {
@@ -172,13 +198,14 @@ func (t *Terminal) NewTab() Tab {
 		manager: t,
 		id:      t.generateTabID(),
 		name:    "Untitled",
-		buffer:  make([]string, 0),
 	}
 
-	tab.buffer = append(tab.buffer, []string{
-		"ID: " + tab.id + "\n\n\n",
-		"Title: " + tab.name + "\n",
-	}...)
+	tab.Println("ID: " + tab.id)
+	tab.Println("Title: " + tab.name)
+
+	for i := 0; i < 30; i++ {
+		tab.Println("newline: " + strconv.Itoa(i))
+	}
 
 	//Add to terminal
 	t.tabs[tab.id] = tab
@@ -199,11 +226,19 @@ func (t *Terminal) generateTabID() string {
 	nextID := 0
 
 	for range t.tabs {
-		if _, ok := t.tabs[strconv.Itoa(nextID)]; ok {
+		if _, found := t.tabs[strconv.Itoa(nextID)]; !found {
 			return strconv.Itoa(nextID)
 		}
 		nextID++
 	}
 
 	return strconv.Itoa(nextID)
+}
+
+func (t *Terminal) getMouseFocus(mouseX int) *Tab {
+	index := mouseX / t.tabWidth
+	if index < 0 || index > len(t.activeTabs)-1 {
+		return nil
+	}
+	return t.activeTabs[mouseX/t.tabWidth]
 }
