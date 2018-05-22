@@ -9,15 +9,16 @@ import (
 
 //Tab asdf
 type Tab struct {
-	manager       *Terminal
-	id            string
-	name          string
-	active        bool
-	buffer        string
-	visibleBuffer [][]termbox.Cell
+	manager *Terminal
+	id      string
+	name    string
+	active  bool
+
 	scrollHeight  int
 	startX        int
 	endX          int
+	buffer        string
+	visibleBuffer [][]termbox.Cell
 }
 
 //Terminate kills the current tab
