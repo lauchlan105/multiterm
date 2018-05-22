@@ -1,7 +1,10 @@
 package multiterm
 
 import (
+	"os"
+	"os/signal"
 	"strconv"
+	"syscall"
 
 	"github.com/nsf/termbox-go"
 )
@@ -18,14 +21,13 @@ type Terminal struct {
 	activeTabs []*Tab
 	focus      *Tab
 	buffer     []termbox.Cell
-	sepIndexes []int
-	tabWidth   int
+	stopChan   chan bool
 }
 
 //Init returns
-func Init() (terminal Terminal, tab Tab) {
+func Init() (terminal Terminal) {
 
-	terminal = Terminal{
+	return Terminal{
 		fg: termbox.ColorDefault,
 		bg: termbox.ColorDefault,
 		splitCell: termbox.Cell{
@@ -34,11 +36,8 @@ func Init() (terminal Terminal, tab Tab) {
 
 		tabs:       make(map[string]Tab, 0),
 		activeTabs: make([]*Tab, 0),
+		stopChan:   make(chan bool, 1),
 	}
-
-	newTab := terminal.NewTab()
-
-	return terminal, newTab
 
 }
 
@@ -56,71 +55,126 @@ func (t *Terminal) Start() {
 	//on the initialised termbox
 	termbox.SetInputMode(termbox.InputEsc | termbox.InputMouse)
 
-	for {
-		switch e := termbox.PollEvent(); e.Type {
-		case termbox.EventKey:
-			if e.Key == 3 {
-				return
-			}
-		case termbox.EventResize:
-			t.printAll()
-		case termbox.EventMouse:
-			if e.Key == termbox.MouseLeft {
-				newTab := t.NewTab()
-				newTab.Open()
-				t.focus = &newTab
-			} else if e.Key == termbox.MouseMiddle {
-				t.focus.Terminate()
-				t.focus = t.activeTabs[0]
-			} else if e.Key == termbox.MouseWheelUp {
-				if tab := t.getMouseFocus(e.MouseX); tab != nil {
-					tab.ScrollUp()
-				}
-				t.printAll()
-			} else if e.Key == termbox.MouseWheelDown {
-
-				if tab := t.getMouseFocus(e.MouseX); tab != nil {
-					tab.ScrollDown()
-				}
-				t.printAll()
-			}
-		}
+	//Create and open the first tab
+	tab := t.NewTab()
+	if tab != nil {
+		tab.Open()
 	}
 
+	//Begin event listeners
+	go func() {
+		for {
+
+			switch e := termbox.PollEvent(); e.Type {
+
+			case termbox.EventKey:
+
+				//Ctrl + C
+				if e.Key == 3 {
+					t.Stop()
+				}
+
+			case termbox.EventMouse:
+
+				//Switch depending on which mouse event happened
+				switch key := e.Key; key {
+
+				case termbox.MouseLeft:
+					newTab := t.NewTab()
+					newTab.Open()
+					t.focus = newTab
+
+				case termbox.MouseRight:
+
+				case termbox.MouseMiddle:
+					if tab := t.getMouseFocus(e.MouseX); tab != nil &&
+						len(t.activeTabs) > 1 {
+						tab.Close()
+						t.focus = t.activeTabs[len(t.activeTabs)-1]
+					}
+
+				case termbox.MouseWheelUp:
+					if tab := t.getMouseFocus(e.MouseX); tab != nil {
+						tab.ScrollUp()
+					}
+
+				case termbox.MouseWheelDown:
+					if tab := t.getMouseFocus(e.MouseX); tab != nil {
+						tab.ScrollDown()
+					}
+
+				}
+
+				//Update all
+				t.printAll()
+
+			}
+
+		}
+	}()
+
+	//Listen for system signals
+	go func() {
+		sc := make(chan os.Signal, 1)
+		signal.Notify(sc, syscall.SIGINT, syscall.SIGTERM, os.Interrupt, os.Kill)
+		<-sc
+		t.stopChan <- true
+	}()
+
+}
+
+//Wait for Stop() to be called
+func (t *Terminal) Wait() {
+	for <-t.stopChan {
+		return
+	}
 }
 
 //Stop executes the necessary functions to
 //shut down the Multi-terminal properly
 func (t *Terminal) Stop() {
 	termbox.Close()
+	t.stopChan <- true
 }
 
+//Updates width and height vars and
+//tab widths
 func (t *Terminal) updateSize() {
 
 	t.width, t.height = termbox.Size()
 
-	//Save new tab width (this includes the sep)
-	if len(t.activeTabs) <= 0 {
-		t.tabWidth = t.width
-	} else {
-		t.tabWidth = t.width / len(t.activeTabs)
-	}
+	numTabs := len(t.activeTabs)
+	if numTabs > 0 {
 
-	//clear the saved seperator indexes
-	t.sepIndexes = make([]int, 0)
+		avgTabWidth := t.width / len(t.activeTabs)
+		leftOverSpace := t.width % numTabs
 
-	//Push new seperator indexes to sepIndexes slice
-	numSeps := len(t.activeTabs) - 1
-	for sep := 1; sep <= numSeps; sep++ {
+		startX := 0
+		endX := -1
+		for i, tab := range t.activeTabs {
+			startX = endX + 1
+			endX = startX + avgTabWidth - 1
 
-		// '-1' offsets to start printing from 0 (not 1)
-		x := (sep * t.tabWidth) - 1
-		t.sepIndexes = append(t.sepIndexes, x)
+			//Distribute the left over space
+			if leftOverSpace > 0 {
+				endX++
+				leftOverSpace--
+			}
+
+			if i == len(t.activeTabs)-1 {
+				endX++
+			}
+
+			tab.startX = startX
+			tab.endX = endX
+
+		}
 
 	}
 
 }
 
+//Call update size and then print tabs and seperators
 func (t *Terminal) printAll() {
 
 	//Update printing-related variables
@@ -140,13 +194,15 @@ func (t *Terminal) printAll() {
 
 //print all tabs
 func (t *Terminal) printTabs() {
+
+	//Asynchronously print tabs
 	blockChan := make(chan bool, 1)
 	waitingOn := len(t.activeTabs)
-	for indexOfTab, tab := range t.activeTabs {
-		go func(i int, tab *Tab) {
-			tab.printTab(i)
+	for _, tab := range t.activeTabs {
+		go func(tab *Tab) {
+			tab.printTab()
 			blockChan <- true
-		}(indexOfTab, tab)
+		}(tab)
 	}
 
 	for <-blockChan {
@@ -155,23 +211,32 @@ func (t *Terminal) printTabs() {
 			return
 		}
 	}
-
 }
 
 //print all tab seperators
 func (t *Terminal) printSeps() {
+
 	//Print seperators
-	for _, x := range t.sepIndexes {
-		// '-1' offsets to start printing from 0 (not 1)
-		for h := 0; h < t.height; h++ {
-			row := h * t.width
-			dest := row + x
-			if dest < len(t.buffer) {
-				t.buffer[row+x] = t.splitCell
+	for _, tab := range t.activeTabs {
+
+		//If the seperator is within the bounds of the window
+		if tab.endX >= 0 && tab.endX < t.width {
+			for h := 0; h < t.height; h++ {
+
+				// '-1' offsets to start printing from 0 (not 1)
+				row := h * t.width
+				dest := row + tab.endX
+
+				if dest < 0 || dest >= len(t.buffer) {
+					continue
+				}
+
+				t.buffer[dest] = t.splitCell
+
 			}
 		}
-
 	}
+
 }
 
 ////////////////////////////////
@@ -191,7 +256,7 @@ func (t *Terminal) updateBuffer() {
 /////////////////////////////////////
 
 //NewTab Generates and creates a new tab
-func (t *Terminal) NewTab() Tab {
+func (t *Terminal) NewTab() *Tab {
 
 	//Create new tab
 	tab := Tab{
@@ -202,16 +267,16 @@ func (t *Terminal) NewTab() Tab {
 
 	tab.Println("ID: " + tab.id)
 	tab.Println("Title: " + tab.name)
-
-	for i := 0; i < 30; i++ {
-		tab.Println("newline: " + strconv.Itoa(i))
+	for i := 0; i < 50; i++ {
+		tab.Println("ID: " + tab.id)
+		tab.Println(" ")
 	}
 
 	//Add to terminal
 	t.tabs[tab.id] = tab
 
 	//return
-	return t.tabs[tab.id]
+	return &tab
 
 }
 
@@ -221,24 +286,27 @@ func (t *Terminal) removeTab(id string) {
 	delete(t.tabs, id)
 }
 
+//Returns an available id based off existing tab ids
 func (t *Terminal) generateTabID() string {
 
 	nextID := 0
-
 	for range t.tabs {
 		if _, found := t.tabs[strconv.Itoa(nextID)]; !found {
 			return strconv.Itoa(nextID)
 		}
 		nextID++
 	}
-
 	return strconv.Itoa(nextID)
+
 }
 
+//Return which tab is under the mouse
 func (t *Terminal) getMouseFocus(mouseX int) *Tab {
-	index := mouseX / t.tabWidth
-	if index < 0 || index > len(t.activeTabs)-1 {
-		return nil
+
+	for _, tab := range t.activeTabs {
+		if mouseX < tab.endX {
+			return tab
+		}
 	}
-	return t.activeTabs[mouseX/t.tabWidth]
+	return nil
 }

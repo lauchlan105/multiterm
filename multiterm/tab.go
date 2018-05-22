@@ -16,6 +16,8 @@ type Tab struct {
 	buffer        string
 	visibleBuffer [][]termbox.Cell
 	scrollHeight  int
+	startX        int
+	endX          int
 }
 
 //Terminate kills the current tab
@@ -34,6 +36,10 @@ func (t *Tab) Open() {
 	t.active = true
 	t.scrollHeight = 0
 
+	if t.visibleBuffer == nil {
+		t.visibleBuffer = make([][]termbox.Cell, 0)
+	}
+
 	t.manager.activeTabs = append(t.manager.activeTabs, t)
 	t.manager.printAll()
 }
@@ -46,7 +52,7 @@ func (t *Tab) Close() {
 	}
 	t.active = false
 
-	//Iterate tabs and break when tab is found
+	//Remove t from active tabs slice
 	for i, tab := range t.manager.activeTabs {
 		if tab.id == t.id {
 			t.manager.activeTabs = append(t.manager.activeTabs[:i],
@@ -57,10 +63,9 @@ func (t *Tab) Close() {
 	t.manager.printAll()
 }
 
-func (t *Tab) printTab(indexOfTab int) {
+func (t *Tab) printTab() {
 
 	windowHeight := t.manager.height
-	startingX := indexOfTab * t.manager.tabWidth
 
 	t.setVisibleBuffer()
 	matrix := t.visibleBuffer
@@ -99,7 +104,7 @@ func (t *Tab) printTab(indexOfTab int) {
 	for rowIndex, row := range matrix {
 		for colIndex, Ch := range row {
 			y := rowIndex * t.manager.width
-			x := colIndex + startingX
+			x := colIndex + t.startX
 			dest := y + x
 			t.manager.buffer[dest] = Ch
 		}
@@ -131,44 +136,47 @@ func (t *Tab) ScrollDown() {
 	}
 }
 
+//adjustVisibileBuffer shifts characters
+//around to match the tab's width
 func (t *Tab) setVisibleBuffer() {
 
-	width := t.manager.tabWidth - 1
+	width := t.endX - t.startX
 	matrix := make([][]termbox.Cell, 0)
 	matrix = append(matrix, make([]termbox.Cell, 0))
 
 	for _, ch := range t.buffer {
 
-		appendChar := func(ch rune) {
+		//if last row doesn't exist -> make it
+		if len(matrix) == 0 {
+			matrix = append(matrix, make([]termbox.Cell, 0))
+		}
 
-			//if last row doesn't exist -> make it
-			if len(matrix) == 0 {
-				matrix = append(matrix, make([]termbox.Cell, 0))
-			}
-
-			//if last row is full
-			//create a new row
-			if len(matrix[len(matrix)-1]) == width {
-				matrix = append(matrix, make([]termbox.Cell, 0))
-			}
-
-			//Get last row
-			rowInd := len(matrix) - 1
-
-			//Append char to current row
-			matrix[rowInd] = append(matrix[rowInd], termbox.Cell{Ch: ch})
-
-			//If the current char is a newline,
-			//append whitespaces to the rest of the row
+		//if last row is full
+		//create a new row
+		if len(matrix[len(matrix)-1]) == width {
 			if ch == '\n' {
-				numberOfWhiteSpaces := width - len(matrix[rowInd])
-				for numberOfWhiteSpaces > 0 {
-					matrix[rowInd] = append(matrix[rowInd], termbox.Cell{Ch: ' '})
-					numberOfWhiteSpaces--
-				}
+				return
+			}
+			matrix = append(matrix, make([]termbox.Cell, 0))
+		}
+
+		//Get last row
+		rowInd := len(matrix) - 1
+
+		//Append char to current matrix row
+		matrix[rowInd] = append(matrix[rowInd], termbox.Cell{Ch: ch})
+
+		//If the current char is a newline,
+		//append whitespaces to the rest of the row
+		if ch == '\n' {
+			numberOfWhiteSpaces := width - len(matrix[rowInd])
+			for numberOfWhiteSpaces > 0 {
+				matrix[rowInd] = append(matrix[rowInd], termbox.Cell{Ch: ' '})
+				numberOfWhiteSpaces--
 			}
 		}
-		appendChar(ch)
+
 	}
+
 	t.visibleBuffer = matrix
 }
