@@ -2,23 +2,21 @@
 package main
 
 import (
-	"fmt"
+	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/lauchlan105/multiterm/multiterm"
 )
 
-type testFunc struct {
-	f func()
-}
-
-func test() {
-	fmt.Println("tester func")
-}
-
 func main() {
-
-	window, _ := multiterm.Init()
-	defer window.Stop()
+	window := multiterm.Init()
+	defer window.Wait()
 	window.Start()
+}
 
+func stayAlive() {
+	sc := make(chan os.Signal, 1)
+	signal.Notify(sc, syscall.SIGINT, syscall.SIGTERM, os.Interrupt, os.Kill)
+	<-sc
 }
