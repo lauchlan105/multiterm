@@ -1,31 +1,52 @@
 package multiterm
 
 import (
-	"log"
-	"os"
+	"io"
+	"os/exec"
 
 	termbox "github.com/nsf/termbox-go"
 )
 
 //Tab asdf
 type Tab struct {
-	manager *Terminal
-	id      string
-	name    string
 	active  bool
+	id      string
+	manager *Terminal
+	Name    string
 
-	scrollHeight  int
-	startX        int
-	endX          int
+	endX   int
+	startX int
+
 	buffer        string
+	scrollHeight  int
 	visibleBuffer [][]termbox.Cell
+
+	cmd    *exec.Cmd
+	stdin  pipe
+	stdout pipe
+}
+
+type pipe struct {
+	r *io.PipeReader
+	w *io.PipeWriter
 }
 
 //Terminate kills the current tab
 //via the Terminal objects removeTab(id) func
 func (t *Tab) Terminate() {
+
+	//Close tabs
 	t.Close()
+
+	//Close io pipes
+	t.stdin.w.Close()
+	t.stdin.r.Close()
+	t.stdout.w.Close()
+	t.stdout.r.Close()
+
+	//Remove tab from manager
 	t.manager.removeTab(t.id)
+
 }
 
 //Open sets the tab's active state to true
@@ -36,6 +57,17 @@ func (t *Tab) Open() {
 	}
 	t.active = true
 	t.scrollHeight = 0
+
+	//Write any input to the input pipe
+	/*
+		go func() {
+			reader := bufio.NewReader(os.Stdin)
+			for {
+				b, _ := reader.ReadBytes('\n')
+				t.stdin.w.Write(b)
+			}
+		}()
+	*/
 
 	if t.visibleBuffer == nil {
 		t.visibleBuffer = make([][]termbox.Cell, 0)
@@ -66,6 +98,10 @@ func (t *Tab) Close() {
 
 func (t *Tab) printTab() {
 
+	if !t.active {
+		return
+	}
+
 	windowHeight := t.manager.height
 
 	t.setVisibleBuffer()
@@ -83,19 +119,11 @@ func (t *Tab) printTab() {
 			endOfWindow += t.scrollHeight
 		}
 
-		startOutOfBounds := startOfWindow < 0 || startOfWindow > len(matrix)
-		endOutOfBounds := endOfWindow < 0 || endOfWindow > len(matrix)
-
-		if startOutOfBounds {
-			log.Println("Starting val out of bounds")
-		}
-
-		if endOutOfBounds {
-			log.Println("Ending val out of bounds")
-		}
+		startOutOfBounds := startOfWindow < 0 || startOfWindow > len(matrix)-1
+		endOutOfBounds := endOfWindow < 0 || endOfWindow > len(matrix)-1
 
 		if endOutOfBounds || startOutOfBounds {
-			os.Exit(1)
+			return
 		}
 
 		matrix = matrix[startOfWindow:endOfWindow]
@@ -116,6 +144,9 @@ func (t *Tab) printTab() {
 //Print prints to the terminal without starting a new line
 func (t *Tab) Print(str string) {
 	t.buffer += str
+	if t.active {
+		t.manager.printAll()
+	}
 }
 
 //Println prints a line to the terminal
@@ -180,4 +211,14 @@ func (t *Tab) setVisibleBuffer() {
 	}
 
 	t.visibleBuffer = matrix
+}
+
+//RunCommand blah blah blah
+func (t *Tab) RunCommand(s []string) error {
+	cmd := exec.Command(s[0], s[1:]...)
+
+	cmd.Stdout = t.stdout.w
+	cmd.Stdin = t.stdin.r
+
+	return cmd.Run()
 }

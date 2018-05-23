@@ -1,6 +1,8 @@
 package multiterm
 
 import (
+	"bufio"
+	"io"
 	"os"
 	"os/signal"
 	"strconv"
@@ -54,12 +56,6 @@ func (t *Terminal) Start() {
 	//Set the terminal objects that rely
 	//on the initialised termbox
 	termbox.SetInputMode(termbox.InputEsc | termbox.InputMouse)
-
-	//Create and open the first tab
-	tab := t.NewTab()
-	if tab != nil {
-		tab.Open()
-	}
 
 	//Begin event listeners
 	go func() {
@@ -134,6 +130,9 @@ func (t *Terminal) Wait() {
 //shut down the Multi-terminal properly
 func (t *Terminal) Stop() {
 	termbox.Close()
+	for _, tab := range t.tabs {
+		tab.Terminate()
+	}
 	t.stopChan <- true
 }
 
@@ -258,19 +257,35 @@ func (t *Terminal) updateBuffer() {
 //NewTab Generates and creates a new tab
 func (t *Terminal) NewTab() *Tab {
 
+	//Create stdin/stdout pipes
+	inR, inW := io.Pipe()
+	outR, outW := io.Pipe()
+
 	//Create new tab
 	tab := Tab{
 		manager: t,
 		id:      t.generateTabID(),
-		name:    "Untitled",
+		Name:    "Untitled",
+		stdin: pipe{
+			r: inR,
+			w: inW,
+		},
+		stdout: pipe{
+			r: outR,
+			w: outW,
+		},
 	}
 
+	//Print anything printed to the output pipe
+	go func() {
+		scanner := bufio.NewScanner(tab.stdout.r)
+		for scanner.Scan() {
+			tab.Println("Output: " + scanner.Text())
+		}
+	}()
+
 	tab.Println("ID: " + tab.id)
-	tab.Println("Title: " + tab.name)
-	for i := 0; i < 50; i++ {
-		tab.Println("ID: " + tab.id)
-		tab.Println(" ")
-	}
+	tab.Println("Title: " + tab.Name)
 
 	//Add to terminal
 	t.tabs[tab.id] = tab
