@@ -3,6 +3,7 @@ package multiterm
 import (
 	"bufio"
 	"io"
+	"log"
 	"os"
 	"os/signal"
 	"strconv"
@@ -20,6 +21,7 @@ type Terminal struct {
 	splitCell termbox.Cell
 
 	tabs       map[string]Tab
+	tabIndexes []int
 	activeTabs []*Tab
 	focus      *Tab
 	buffer     []termbox.Cell
@@ -204,6 +206,8 @@ func (t *Terminal) printTabs() {
 		}(tab)
 	}
 
+	//wait for all to print
+	//before exiting func
 	for <-blockChan {
 		waitingOn--
 		if waitingOn == 0 {
@@ -246,7 +250,7 @@ func (t *Terminal) printSeps() {
 func (t *Terminal) updateBuffer() {
 	copy(termbox.CellBuffer(), t.buffer)
 	if err := termbox.Flush(); err != nil {
-
+		log.Fatal(err)
 	}
 }
 
