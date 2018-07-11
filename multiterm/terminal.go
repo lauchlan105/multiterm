@@ -1,6 +1,9 @@
 package multiterm
 
 import (
+	"bufio"
+	"io"
+	"log"
 	"os"
 	"os/signal"
 	"strconv"
@@ -54,12 +57,6 @@ func (t *Terminal) Start() {
 	//Set the terminal objects that rely
 	//on the initialised termbox
 	termbox.SetInputMode(termbox.InputEsc | termbox.InputMouse)
-
-	//Create and open the first tab
-	tab := t.NewTab()
-	if tab != nil {
-		tab.Open()
-	}
 
 	//Begin event listeners
 	go func() {
@@ -134,6 +131,9 @@ func (t *Terminal) Wait() {
 //shut down the Multi-terminal properly
 func (t *Terminal) Stop() {
 	termbox.Close()
+	for _, tab := range t.tabs {
+		tab.Terminate()
+	}
 	t.stopChan <- true
 }
 
@@ -142,26 +142,22 @@ func (t *Terminal) Stop() {
 func (t *Terminal) updateSize() {
 
 	t.width, t.height = termbox.Size()
-
 	numTabs := len(t.activeTabs)
+
 	if numTabs > 0 {
 
-		avgTabWidth := t.width / len(t.activeTabs)
-		leftOverSpace := t.width % numTabs
+		//divides width of terminal excluding spacers
+		avgTabWidth := (t.width - (numTabs - 1)) / numTabs
+		leftOverSpace := (t.width - (numTabs - 1)) % numTabs
 
 		startX := 0
 		endX := -1
 		for i, tab := range t.activeTabs {
 			startX = endX + 1
-			endX = startX + avgTabWidth - 1
+			endX = startX + avgTabWidth
 
 			//Distribute the left over space
-			if leftOverSpace > 0 {
-				endX++
-				leftOverSpace--
-			}
-
-			if i == len(t.activeTabs)-1 {
+			if i < leftOverSpace {
 				endX++
 			}
 
@@ -205,6 +201,8 @@ func (t *Terminal) printTabs() {
 		}(tab)
 	}
 
+	//wait for all to print
+	//before exiting func
 	for <-blockChan {
 		waitingOn--
 		if waitingOn == 0 {
@@ -216,17 +214,23 @@ func (t *Terminal) printTabs() {
 //print all tab seperators
 func (t *Terminal) printSeps() {
 
-	//Print seperators
-	for _, tab := range t.activeTabs {
+	if len(t.activeTabs) > 1 {
 
-		//If the seperator is within the bounds of the window
-		if tab.endX >= 0 && tab.endX < t.width {
+		//tabs that start after a seperator
+		relativeTabs := t.activeTabs[1:]
+
+		for _, tab := range relativeTabs {
 			for h := 0; h < t.height; h++ {
 
-				// '-1' offsets to start printing from 0 (not 1)
+				/*
+				 * row is the index within buffer
+				 * where the row starts. Not the actual row
+				 */
 				row := h * t.width
-				dest := row + tab.endX
+				col := tab.startX - 1
+				dest := row + col
 
+				//if out of bounds
 				if dest < 0 || dest >= len(t.buffer) {
 					continue
 				}
@@ -247,7 +251,7 @@ func (t *Terminal) printSeps() {
 func (t *Terminal) updateBuffer() {
 	copy(termbox.CellBuffer(), t.buffer)
 	if err := termbox.Flush(); err != nil {
-
+		log.Fatal(err)
 	}
 }
 
@@ -258,19 +262,35 @@ func (t *Terminal) updateBuffer() {
 //NewTab Generates and creates a new tab
 func (t *Terminal) NewTab() *Tab {
 
+	//Create stdin/stdout pipes
+	inR, inW := io.Pipe()
+	outR, outW := io.Pipe()
+
 	//Create new tab
 	tab := Tab{
 		manager: t,
 		id:      t.generateTabID(),
-		name:    "Untitled",
+		Name:    "Untitled",
+		stdin: pipe{
+			r: inR,
+			w: inW,
+		},
+		stdout: pipe{
+			r: outR,
+			w: outW,
+		},
 	}
 
+	//Print anything printed to the output pipe
+	go func() {
+		scanner := bufio.NewScanner(tab.stdout.r)
+		for scanner.Scan() {
+			tab.Println("Output: " + scanner.Text())
+		}
+	}()
+
 	tab.Println("ID: " + tab.id)
-	tab.Println("Title: " + tab.name)
-	for i := 0; i < 50; i++ {
-		tab.Println("ID: " + tab.id)
-		tab.Println(" ")
-	}
+	tab.Println("Title: " + tab.Name)
 
 	//Add to terminal
 	t.tabs[tab.id] = tab
