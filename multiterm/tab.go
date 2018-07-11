@@ -141,7 +141,7 @@ func (t *Tab) printTab() {
 
 }
 
-//Print prints to the terminal without starting a new line
+//Print prints to the terminal without appending a new line char
 func (t *Tab) Print(str string) {
 	t.buffer += str
 	if t.active {
@@ -192,7 +192,7 @@ func (t *Tab) setVisibleBuffer() {
 			matrix = append(matrix, make([]termbox.Cell, 0))
 		}
 
-		//Get last row
+		//Get index of last row
 		rowInd := len(matrix) - 1
 
 		//Append char to current matrix row

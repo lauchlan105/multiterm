@@ -21,7 +21,6 @@ type Terminal struct {
 	splitCell termbox.Cell
 
 	tabs       map[string]Tab
-	tabIndexes []int
 	activeTabs []*Tab
 	focus      *Tab
 	buffer     []termbox.Cell
@@ -143,26 +142,22 @@ func (t *Terminal) Stop() {
 func (t *Terminal) updateSize() {
 
 	t.width, t.height = termbox.Size()
-
 	numTabs := len(t.activeTabs)
+
 	if numTabs > 0 {
 
-		avgTabWidth := t.width / len(t.activeTabs)
-		leftOverSpace := t.width % numTabs
+		//divides width of terminal excluding spacers
+		avgTabWidth := (t.width - (numTabs - 1)) / numTabs
+		leftOverSpace := (t.width - (numTabs - 1)) % numTabs
 
 		startX := 0
 		endX := -1
 		for i, tab := range t.activeTabs {
 			startX = endX + 1
-			endX = startX + avgTabWidth - 1
+			endX = startX + avgTabWidth
 
 			//Distribute the left over space
-			if leftOverSpace > 0 {
-				endX++
-				leftOverSpace--
-			}
-
-			if i == len(t.activeTabs)-1 {
+			if i < leftOverSpace {
 				endX++
 			}
 
@@ -219,17 +214,23 @@ func (t *Terminal) printTabs() {
 //print all tab seperators
 func (t *Terminal) printSeps() {
 
-	//Print seperators
-	for _, tab := range t.activeTabs {
+	if len(t.activeTabs) > 1 {
 
-		//If the seperator is within the bounds of the window
-		if tab.endX >= 0 && tab.endX < t.width {
+		//tabs that start after a seperator
+		relativeTabs := t.activeTabs[1:]
+
+		for _, tab := range relativeTabs {
 			for h := 0; h < t.height; h++ {
 
-				// '-1' offsets to start printing from 0 (not 1)
+				/*
+				 * row is the index within buffer
+				 * where the row starts. Not the actual row
+				 */
 				row := h * t.width
-				dest := row + tab.endX
+				col := tab.startX - 1
+				dest := row + col
 
+				//if out of bounds
 				if dest < 0 || dest >= len(t.buffer) {
 					continue
 				}

@@ -61,7 +61,7 @@ func main() {
 
 	tab := window.NewTab()
 	tab.Open()
-	tab.RunCommand([]string{"go", "run", "maintwo/test.go"})
+	// tab.RunCommand([]string{"go", "run", "maintwo/test.go"})
 
 	// oneTab := window.NewTab()
 	// oneTab.Open()
