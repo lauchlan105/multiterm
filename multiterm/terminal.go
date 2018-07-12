@@ -25,6 +25,10 @@ type Terminal struct {
 	focus      *Tab
 	buffer     []termbox.Cell
 	stopChan   chan bool
+
+	popupDefaultColor termbox.Attribute
+	popupErrorColor   termbox.Attribute
+	popupPosition     Position
 }
 
 //Init returns
@@ -40,6 +44,10 @@ func Init() (terminal Terminal) {
 		tabs:       make(map[string]Tab, 0),
 		activeTabs: make([]*Tab, 0),
 		stopChan:   make(chan bool, 1),
+
+		popupDefaultColor: termbox.ColorCyan,
+		popupErrorColor:   termbox.ColorRed,
+		popupPosition:     bottomRight,
 	}
 
 }
