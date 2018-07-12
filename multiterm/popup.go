@@ -14,9 +14,10 @@ type Popup struct {
 	X int
 	Y int
 
-	content   string
-	matrix    [][]termbox.Cell
-	popupTime int
+	content     string
+	matrix      [][]termbox.Cell
+	popupTime   int
+	timeoutChan chan bool
 }
 
 //Position determines which corner the popups spawn
@@ -97,11 +98,13 @@ func (t *Terminal) print(str string, bgColor termbox.Attribute) {
 
 	}
 
-	newPopup := Popup{
-		width:     longestRow,
-		height:    len(matrix),
-		matrix:    matrix,
-		popupTime: t.PopupTime,
+	//Create new popup
+	newPopup := &Popup{
+		width:       longestRow,
+		height:      len(matrix),
+		matrix:      matrix,
+		popupTime:   t.PopupTime,
+		timeoutChan: make(chan bool, 1),
 	}
 
 	switch t.PopupPosition {
@@ -123,16 +126,25 @@ func (t *Terminal) print(str string, bgColor termbox.Attribute) {
 		break
 	}
 
+	//append newPopup to start of popups slice
+	t.popups = append([]*Popup{newPopup}, t.popups...)
+
 }
 
 func (p *Popup) kill() {
-	go func() {
+	go func(p *Popup) {
 		for p.popupTime > 0 {
 			time.Sleep(time.Second)
 			p.popupTime--
 		}
+		p.timeoutChan <- false
+	}(p)
+}
 
-		//stop printing
+func (p *Popup) print() {
+	go func() {
+		for <-p.timeoutChan {
 
+		}
 	}()
 }

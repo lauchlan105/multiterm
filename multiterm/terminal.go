@@ -8,6 +8,7 @@ import (
 	"os/signal"
 	"strconv"
 	"syscall"
+	"time"
 
 	"github.com/nsf/termbox-go"
 )
@@ -35,7 +36,7 @@ type Terminal struct {
 	PopupPosition     Position
 	PopupWidth        int //percentage of terminal
 	PopupTime         int //seconds
-	popups            []Popup
+	popups            []*Popup
 }
 
 //Init returns
@@ -133,6 +134,19 @@ func (t *Terminal) Start() {
 		signal.Notify(sc, syscall.SIGINT, syscall.SIGTERM, os.Interrupt, os.Kill)
 		<-sc
 		t.stopChan <- true
+	}()
+
+	go func() {
+		time.Sleep(50 * time.Millisecond)
+		for {
+			if len(t.popups) == 0 {
+				t.activeTabs[0].Println("was 0")
+			} else {
+				t.activeTabs[0].Println(strconv.Itoa(len(t.popups)))
+			}
+			time.Sleep(2 * time.Second)
+		}
+
 	}()
 
 }
