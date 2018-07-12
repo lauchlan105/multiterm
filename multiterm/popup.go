@@ -1,6 +1,7 @@
 package multiterm
 
 import (
+	"strconv"
 	"time"
 
 	"github.com/nsf/termbox-go"
@@ -8,16 +9,18 @@ import (
 
 //Popup blah
 type Popup struct {
+	manager *Terminal
+
 	width  int
 	height int
 
 	X int
 	Y int
 
-	content     string
-	matrix      [][]termbox.Cell
-	popupTime   int
-	timeoutChan chan bool
+	id      string
+	active  bool
+	content string
+	matrix  [][]termbox.Cell
 }
 
 //Position determines which corner the popups spawn
@@ -100,13 +103,16 @@ func (t *Terminal) print(str string, bgColor termbox.Attribute) {
 
 	//Create new popup
 	newPopup := &Popup{
-		width:       longestRow,
-		height:      len(matrix),
-		matrix:      matrix,
-		popupTime:   t.PopupTime,
-		timeoutChan: make(chan bool, 1),
+		manager: t,
+		id:      strconv.Itoa(len(t.popups)) + time.Now().String(),
+		width:   longestRow,
+		height:  len(matrix),
+		matrix:  matrix,
+		content: str,
+		active:  false,
 	}
 
+	//Set position based vars
 	switch t.PopupPosition {
 	case topLeft:
 		newPopup.X = 1
@@ -127,24 +133,23 @@ func (t *Terminal) print(str string, bgColor termbox.Attribute) {
 	}
 
 	//append newPopup to start of popups slice
-	t.popups = append([]*Popup{newPopup}, t.popups...)
+	t.popups[newPopup.id] = newPopup
 
+}
+
+func (p *Popup) print() {
+	defer p.kill()
+	p.active = true
+	go func() {
+		for p.active {
+
+		}
+	}()
 }
 
 func (p *Popup) kill() {
 	go func(p *Popup) {
-		for p.popupTime > 0 {
-			time.Sleep(time.Second)
-			p.popupTime--
-		}
-		p.timeoutChan <- false
+		time.Sleep(time.Duration(p.manager.PopupTime) * time.Second)
+		p.active = false
 	}(p)
-}
-
-func (p *Popup) print() {
-	go func() {
-		for <-p.timeoutChan {
-
-		}
-	}()
 }

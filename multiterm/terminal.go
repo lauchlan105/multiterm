@@ -36,7 +36,7 @@ type Terminal struct {
 	PopupPosition     Position
 	PopupWidth        int //percentage of terminal
 	PopupTime         int //seconds
-	popups            []*Popup
+	popups            map[string]*Popup
 }
 
 //Init returns
@@ -58,6 +58,7 @@ func Init() (terminal Terminal) {
 		PopupPosition:     bottomRight,
 		PopupWidth:        70,
 		PopupTime:         5,
+		popups:            make(map[string]*Popup),
 	}
 
 }
@@ -146,7 +147,6 @@ func (t *Terminal) Start() {
 			}
 			time.Sleep(2 * time.Second)
 		}
-
 	}()
 
 }
