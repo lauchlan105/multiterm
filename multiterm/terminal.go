@@ -14,21 +14,26 @@ import (
 
 //Terminal asdf
 type Terminal struct {
+
+	//Terminal Attributes
 	height    int
 	width     int
 	fg        termbox.Attribute
 	bg        termbox.Attribute
 	splitCell termbox.Cell
 
+	//Tab Attributes
 	tabs       map[string]Tab
 	activeTabs []*Tab
 	focus      *Tab
 	buffer     []termbox.Cell
 	stopChan   chan bool
 
+	//Popup Attributes
 	popupDefaultColor termbox.Attribute
 	popupErrorColor   termbox.Attribute
 	popupPosition     Position
+	popupTime         int //seconds
 }
 
 //Init returns
@@ -48,6 +53,7 @@ func Init() (terminal Terminal) {
 		popupDefaultColor: termbox.ColorCyan,
 		popupErrorColor:   termbox.ColorRed,
 		popupPosition:     bottomRight,
+		popupTime:         5,
 	}
 
 }
