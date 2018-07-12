@@ -66,7 +66,7 @@ func main() {
 	go func() {
 		for {
 			time.Sleep(2 * time.Second)
-			window.Print("TESTTESTTEST")
+			window.Print("hellow world")
 		}
 	}()
 

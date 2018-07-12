@@ -30,10 +30,12 @@ type Terminal struct {
 	stopChan   chan bool
 
 	//Popup Attributes
-	popupDefaultColor termbox.Attribute
-	popupErrorColor   termbox.Attribute
-	popupPosition     Position
-	popupTime         int //seconds
+	PopupDefaultColor termbox.Attribute
+	PopupErrorColor   termbox.Attribute
+	PopupPosition     Position
+	PopupWidth        int //percentage of terminal
+	PopupTime         int //seconds
+	popups            []Popup
 }
 
 //Init returns
@@ -50,10 +52,11 @@ func Init() (terminal Terminal) {
 		activeTabs: make([]*Tab, 0),
 		stopChan:   make(chan bool, 1),
 
-		popupDefaultColor: termbox.ColorCyan,
-		popupErrorColor:   termbox.ColorRed,
-		popupPosition:     bottomRight,
-		popupTime:         5,
+		PopupDefaultColor: termbox.ColorCyan,
+		PopupErrorColor:   termbox.ColorRed,
+		PopupPosition:     bottomRight,
+		PopupWidth:        70,
+		PopupTime:         5,
 	}
 
 }

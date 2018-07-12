@@ -1,8 +1,23 @@
 package multiterm
 
 import (
+	"time"
+
 	"github.com/nsf/termbox-go"
 )
+
+//Popup blah
+type Popup struct {
+	width  int
+	height int
+
+	X int
+	Y int
+
+	content   string
+	matrix    [][]termbox.Cell
+	popupTime int
+}
 
 //Position determines which corner the popups spawn
 type Position int
@@ -16,41 +31,108 @@ const (
 
 //Print displays the content as a popup.
 //Background color defined by terminal.popupDefaultColor
-func (t *Terminal) Print(content interface{}) {
-	t.print(content.(string), t.popupDefaultColor)
+func (t *Terminal) Print(content string) {
+	t.print(content, t.PopupDefaultColor)
 }
 
 //Error displays the content as a popup.
 //Background color defined by terminal.popupErrorColor
-func (t *Terminal) Error(content interface{}) {
-	t.print(content.(string), t.popupErrorColor)
+func (t *Terminal) Error(content string) {
+	t.print(content, t.PopupErrorColor)
 }
 
 func (t *Terminal) print(str string, bgColor termbox.Attribute) {
 
-	fmtStr := make([][]rune, 0)
+	matrix := make([][]termbox.Cell, 0)
 
 	//Create first line
-	fmtStr = append(fmtStr, make([]rune, 0))
+	matrix = append(matrix, make([]termbox.Cell, 0))
+	matrix = append(matrix, make([]termbox.Cell, 0))
 	longestRow := 0
 
+	//Convert string into cell matrix
 	for i, ch := range str {
 
-		if ch == '\n' {
+		currentRow := &matrix[len(matrix)-1]
+
+		//if a new row => insert first padding rune
+		if len(*currentRow) == 0 {
+			newCell := termbox.Cell{Ch: ' ', Bg: bgColor}
+			*currentRow = append(*currentRow, newCell)
+		}
+
+		//Move to next line on \n char
+		//OR force newline if the current row is larger than
+		//the max width defined under terminal.popupWidth
+		if ch == '\n' || len(*currentRow) > (t.width/100)*t.PopupWidth {
 
 			//Re-check for longest row
-			currentRowLength := len(fmtStr[len(fmtStr)-1])
-			if currentRowLength > len(fmtStr[longestRow]) {
+			currentRowLength := len(*currentRow)
+			if currentRowLength > len(matrix[longestRow]) {
 				longestRow = i
 			}
 
-			fmtStr = append(fmtStr, make([]rune, 0))
+			matrix = append(matrix, make([]termbox.Cell, 0))
 			continue
 		}
 
 		//Append current ch to end of the last row
-		fmtStr[len(fmtStr)-1] = append(fmtStr[len(fmtStr)-1], ch)
+		newCell := termbox.Cell{Ch: ch, Bg: bgColor}
+		*currentRow = append(*currentRow, newCell)
 
 	}
 
+	//Add last line of padding
+	matrix = append(matrix, make([]termbox.Cell, 0))
+
+	//Fill out the popup
+	for _, row := range matrix {
+
+		toAppend := longestRow - len(row)
+
+		for toAppend > 0 {
+			row = append(row, termbox.Cell{Ch: ' ', Bg: bgColor})
+			toAppend--
+		}
+
+	}
+
+	newPopup := Popup{
+		width:     longestRow,
+		height:    len(matrix),
+		matrix:    matrix,
+		popupTime: t.PopupTime,
+	}
+
+	switch t.PopupPosition {
+	case topLeft:
+		newPopup.X = 1
+		newPopup.Y = 1
+		break
+	case topRight:
+		newPopup.X = t.width - newPopup.width - 2
+		newPopup.Y = 1
+		break
+	case bottomLeft:
+		newPopup.X = 1
+		newPopup.Y = t.height - newPopup.height - 2
+		break
+	case bottomRight:
+		newPopup.X = t.width - newPopup.width - 2
+		newPopup.Y = t.height - newPopup.height - 2
+		break
+	}
+
+}
+
+func (p *Popup) kill() {
+	go func() {
+		for p.popupTime > 0 {
+			time.Sleep(time.Second)
+			p.popupTime--
+		}
+
+		//stop printing
+
+	}()
 }
