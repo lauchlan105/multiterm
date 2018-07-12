@@ -47,6 +47,7 @@ func (t *Terminal) Error(content string) {
 
 func (t *Terminal) print(str string, bgColor termbox.Attribute) {
 
+	str = str + "\n"
 	matrix := make([][]termbox.Cell, 0)
 
 	//Create first line
@@ -55,7 +56,7 @@ func (t *Terminal) print(str string, bgColor termbox.Attribute) {
 	longestRow := 0
 
 	//Convert string into cell matrix
-	for i, ch := range str {
+	for _, ch := range str {
 
 		currentRow := &matrix[len(matrix)-1]
 
@@ -71,9 +72,8 @@ func (t *Terminal) print(str string, bgColor termbox.Attribute) {
 		if ch == '\n' || len(*currentRow) > (t.width/100)*t.PopupWidth {
 
 			//Re-check for longest row
-			currentRowLength := len(*currentRow)
-			if currentRowLength > len(matrix[longestRow]) {
-				longestRow = i
+			if len(*currentRow) > longestRow {
+				longestRow = len(*currentRow)
 			}
 
 			matrix = append(matrix, make([]termbox.Cell, 0))
@@ -86,16 +86,13 @@ func (t *Terminal) print(str string, bgColor termbox.Attribute) {
 
 	}
 
-	//Add last line of padding
-	matrix = append(matrix, make([]termbox.Cell, 0))
-
 	//Fill out the popup
-	for _, row := range matrix {
+	for i, row := range matrix {
 
 		toAppend := longestRow - len(row)
 
-		for toAppend > 0 {
-			row = append(row, termbox.Cell{Ch: ' ', Bg: bgColor})
+		for toAppend >= 0 {
+			matrix[i] = append(matrix[i], termbox.Cell{Ch: ' ', Bg: bgColor})
 			toAppend--
 		}
 
@@ -104,7 +101,7 @@ func (t *Terminal) print(str string, bgColor termbox.Attribute) {
 	//Create new popup
 	newPopup := &Popup{
 		manager: t,
-		id:      strconv.Itoa(len(t.popups)) + time.Now().String(),
+		id:      strconv.Itoa(time.Now().Second()),
 		width:   longestRow,
 		height:  len(matrix),
 		matrix:  matrix,
@@ -124,32 +121,67 @@ func (t *Terminal) print(str string, bgColor termbox.Attribute) {
 		break
 	case bottomLeft:
 		newPopup.X = 1
-		newPopup.Y = t.height - newPopup.height - 2
+		newPopup.Y = t.height - newPopup.height
 		break
-	case bottomRight:
+	default: //default is also bottomRight
 		newPopup.X = t.width - newPopup.width - 2
-		newPopup.Y = t.height - newPopup.height - 2
+		newPopup.Y = t.height - newPopup.height
 		break
 	}
 
-	//append newPopup to start of popups slice
-	t.popups[newPopup.id] = newPopup
+	newPopup.print()
 
 }
 
 func (p *Popup) print() {
+
 	defer p.kill()
 	p.active = true
+
+	//Shift all other popups
+	for _, popup := range p.manager.popups {
+		pos := p.manager.PopupPosition
+		if pos == topLeft || pos == topRight {
+			popup.Y += p.height + 1
+		} else {
+			popup.Y -= p.height + 1
+		}
+	}
+
+	p.manager.popups[p.id] = p
+
 	go func() {
 		for p.active {
 
+			for r, row := range p.matrix {
+
+				destRow := p.manager.width * (p.Y + r)
+
+				for c, cell := range row {
+
+					destCol := p.X + c
+					dest := destRow + destCol
+					if dest < 0 || dest >= len(p.manager.buffer) {
+						continue
+					}
+					p.manager.buffer[dest] = cell
+
+				}
+
+			}
+
+			p.manager.updateBuffer()
+			time.Sleep(250 * time.Millisecond)
 		}
 	}()
+
 }
 
 func (p *Popup) kill() {
 	go func(p *Popup) {
 		time.Sleep(time.Duration(p.manager.PopupTime) * time.Second)
 		p.active = false
+		delete(p.manager.popups, p.id)
+		p.manager.printAll()
 	}(p)
 }
