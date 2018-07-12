@@ -2,7 +2,6 @@
 package main
 
 import (
-	"fmt"
 	stdio "io"
 	"os"
 	"os/signal"
@@ -63,10 +62,14 @@ func main() {
 
 	tab := window.NewTab()
 	tab.Open()
-	for {
-		time.Sleep(2 * time.Second)
-		fmt.Println("TESTTESTTEST")
-	}
+
+	go func() {
+		for {
+			time.Sleep(2 * time.Second)
+			window.Print("TESTTESTTEST")
+		}
+	}()
+
 	// tab.RunCommand([]string{"go", "run", "maintwo/test.go"})
 
 	// oneTab := window.NewTab()
