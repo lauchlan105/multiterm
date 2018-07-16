@@ -6,7 +6,6 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
 
 	"github.com/lauchlan105/multiterm/multiterm"
 )
@@ -62,13 +61,6 @@ func main() {
 
 	tab := window.NewTab()
 	tab.Open()
-
-	go func() {
-		for {
-			time.Sleep(2 * time.Second)
-			window.Print("hellow world")
-		}
-	}()
 
 	// tab.RunCommand([]string{"go", "run", "maintwo/test.go"})
 
