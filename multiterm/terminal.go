@@ -17,11 +17,12 @@ import (
 type Terminal struct {
 
 	//Terminal Attributes
-	height    int
-	width     int
-	fg        termbox.Attribute
-	bg        termbox.Attribute
-	splitCell termbox.Cell
+	height       int
+	width        int
+	fg           termbox.Attribute
+	bg           termbox.Attribute
+	splitCell    termbox.Cell
+	printingChan chan *Matrix
 
 	//Tab Attributes
 	tabs       map[string]Tab
@@ -48,6 +49,7 @@ func Init() (terminal Terminal) {
 		splitCell: termbox.Cell{
 			Bg: termbox.ColorWhite,
 		},
+		printingChan: make(chan *Matrix),
 
 		tabs:       make(map[string]Tab, 0),
 		activeTabs: make([]*Tab, 0),
@@ -76,6 +78,26 @@ func (t *Terminal) Start() {
 	//Set the terminal objects that rely
 	//on the initialised termbox
 	termbox.SetInputMode(termbox.InputEsc | termbox.InputMouse)
+
+	//Start printer
+	go func() {
+		for {
+			matrix := <-t.printingChan
+
+			//replace t.buffer with matrix content
+			for rowIndex, row := range matrix.Content {
+				for colIndex, Ch := range row {
+					y := (rowIndex + matrix.Y) * t.width
+					x := colIndex + matrix.X
+					dest := y + x
+					t.buffer[dest] = Ch
+				}
+			}
+
+			//flush buffer
+			t.flushBuffer()
+		}
+	}()
 
 	//Begin event listeners
 	go func() {
@@ -215,7 +237,7 @@ func (t *Terminal) printAll() {
 	t.printSeps()
 
 	//Copy buffer to termbox
-	t.updateBuffer()
+	t.flushBuffer()
 
 }
 
@@ -278,8 +300,12 @@ func (t *Terminal) printSeps() {
 //  BUFFER RELATED FUNCTIONS  //
 ////////////////////////////////
 
+func (t *Terminal) updateBuffer(m *Matrix) {
+	t.printingChan <- m
+}
+
 //copy t.buffer to termbox buffer
-func (t *Terminal) updateBuffer() {
+func (t *Terminal) flushBuffer() {
 	copy(termbox.CellBuffer(), t.buffer)
 	if err := termbox.Flush(); err != nil {
 		log.Fatal(err)
