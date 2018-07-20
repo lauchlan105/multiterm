@@ -3,8 +3,6 @@ package multiterm
 import (
 	"io"
 	"os/exec"
-
-	termbox "github.com/nsf/termbox-go"
 )
 
 //Tab asdf
@@ -19,11 +17,10 @@ type Tab struct {
 
 	buffer        string
 	scrollHeight  int
-	visibleBuffer [][]termbox.Cell
-
-	cmd    *exec.Cmd
-	stdin  pipe
-	stdout pipe
+	visibleBuffer *Matrix
+	cmd           *exec.Cmd
+	stdin         pipe
+	stdout        pipe
 }
 
 type pipe struct {
@@ -70,7 +67,7 @@ func (t *Tab) Open() {
 	*/
 
 	if t.visibleBuffer == nil {
-		t.visibleBuffer = make([][]termbox.Cell, 0)
+		t.visibleBuffer = newMatrix()
 	}
 
 	t.manager.activeTabs = append(t.manager.activeTabs, t)
@@ -110,35 +107,27 @@ func (t *Tab) printTab() {
 	//if the matrix has more lines than
 	//the window height allows -> remove all lines
 	//outside the frame (based off scrollheight)
-	if len(matrix) > windowHeight {
+	if matrix.Height > windowHeight {
 
-		startOfWindow := len(matrix) - t.scrollHeight - windowHeight
+		startOfWindow := matrix.Height - t.scrollHeight - windowHeight
 		endOfWindow := startOfWindow + windowHeight - 1
 
 		if t.scrollHeight < 0 {
 			endOfWindow += t.scrollHeight
 		}
 
-		startOutOfBounds := startOfWindow < 0 || startOfWindow > len(matrix)-1
-		endOutOfBounds := endOfWindow < 0 || endOfWindow > len(matrix)-1
+		startOutOfBounds := startOfWindow < 0 || startOfWindow > matrix.Height-1
+		endOutOfBounds := endOfWindow < 0 || endOfWindow > matrix.Height-1
 
 		if endOutOfBounds || startOutOfBounds {
 			return
 		}
 
-		matrix = matrix[startOfWindow:endOfWindow]
+		matrix.Content = matrix.Content[startOfWindow:endOfWindow]
 
 	}
 
-	for rowIndex, row := range matrix {
-		for colIndex, Ch := range row {
-			y := rowIndex * t.manager.width
-			x := colIndex + t.startX
-			dest := y + x
-			t.manager.buffer[dest] = Ch
-		}
-	}
-
+	t.manager.updateBuffer(matrix)
 }
 
 //Print prints to the terminal without appending a new line char
@@ -156,7 +145,7 @@ func (t *Tab) Println(str string) {
 
 //ScrollUp asdf
 func (t *Tab) ScrollUp() {
-	if t.scrollHeight < len(t.visibleBuffer)-t.manager.height {
+	if t.scrollHeight < t.visibleBuffer.Height-t.manager.height {
 		t.scrollHeight++
 	}
 }
@@ -173,44 +162,51 @@ func (t *Tab) ScrollDown() {
 func (t *Tab) setVisibleBuffer() {
 
 	width := t.endX - t.startX
-	matrix := make([][]termbox.Cell, 0)
-	matrix = append(matrix, make([]termbox.Cell, 0))
 
-	for _, ch := range t.buffer {
-
-		//if last row doesn't exist -> make it
-		if len(matrix) == 0 {
-			matrix = append(matrix, make([]termbox.Cell, 0))
-		}
-
-		//if last row is full
-		//create a new row
-		if len(matrix[len(matrix)-1]) == width {
-			if ch == '\n' {
-				return
-			}
-			matrix = append(matrix, make([]termbox.Cell, 0))
-		}
-
-		//Get index of last row
-		rowInd := len(matrix) - 1
-
-		//Append char to current matrix row
-		matrix[rowInd] = append(matrix[rowInd], termbox.Cell{Ch: ch})
-
-		//If the current char is a newline,
-		//append whitespaces to the rest of the row
-		if ch == '\n' {
-			numberOfWhiteSpaces := width - len(matrix[rowInd])
-			for numberOfWhiteSpaces > 0 {
-				matrix[rowInd] = append(matrix[rowInd], termbox.Cell{Ch: ' '})
-				numberOfWhiteSpaces--
-			}
-		}
-
+	if matrix, err := makeMatrix(t.buffer, width, -1, t.manager.bg, false); err != "" {
+		t.manager.Print(err)
+	} else {
+		matrix.X = t.startX
+		matrix.Y = 0
+		t.visibleBuffer = matrix
 	}
 
-	t.visibleBuffer = matrix
+	/*
+		for _, ch := range t.buffer {
+
+			//if last row doesn't exist -> make it
+			if len(matrix) == 0 {
+				matrix = append(matrix, make([]termbox.Cell, 0))
+			}
+
+			//if last row is full
+			//create a new row
+			if len(matrix[len(matrix)-1]) == width {
+				if ch == '\n' {
+					return
+				}
+				matrix = append(matrix, make([]termbox.Cell, 0))
+			}
+
+			//Get index of last row
+			rowInd := len(matrix) - 1
+
+			//Append char to current matrix row
+			matrix[rowInd] = append(matrix[rowInd], termbox.Cell{Ch: ch})
+
+			//If the current char is a newline,
+			//append whitespaces to the rest of the row
+			if ch == '\n' {
+				numberOfWhiteSpaces := width - len(matrix[rowInd])
+				for numberOfWhiteSpaces > 0 {
+					matrix[rowInd] = append(matrix[rowInd], termbox.Cell{Ch: ' '})
+					numberOfWhiteSpaces--
+				}
+			}
+
+		}
+	*/
+
 }
 
 //RunCommand blah blah blah
