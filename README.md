@@ -1,5 +1,5 @@
 # multiterm
-This project is still in its infancy and development is halted as of now.
+This project is still in its infancy and development is currently on hold.
 The MultiTerm project is intended to allow multiple programs of any kind to be run as sub-processes of a
 single program.
 
