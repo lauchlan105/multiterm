@@ -4,6 +4,7 @@ The MultiTerm project is intended to allow multiple programs of any kind to be r
 single program.
 
 The intended purpose is to equip each program with its own IO stream and allow programs to communicate at a 
-CLI level, all bundled in a robust terminal-based interface complete with tabs and menus.
+CLI level, all bundled in a robust terminal-based interface complete with a tabular layout, independant stream
+scrolling and event based menus.
 
 __Demo gifs to come__
