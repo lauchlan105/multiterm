@@ -6,7 +6,7 @@ single program.
 The intended purpose is to equip each program with its own IO stream and allow programs to relay information between one-another, all bundled in a robust terminal-based interface complete with a tabular layout, independant stream
 scrolling and event based menus.
 
-> The main program is located under 'multiterm'
+> The main program is located under 'multiterm'<br>
 > 'maintwo' houses a simple testing function that is used to show input/output streams between the main (multiterm) and the test program
 
 __Demo gifs to come__
